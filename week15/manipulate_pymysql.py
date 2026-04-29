@@ -50,10 +50,10 @@ def demo_select(conn):
 
     # dictionary cursor — access columns by name
     with conn.cursor(pymysql.cursors.DictCursor) as cursor:
-        cursor.execute("SELECT id, product, amount, status FROM orders LIMIT 5")
+        cursor.execute("SELECT id, product_id, quantity, status FROM orders LIMIT 5")
         print("\nDictionary cursor:")
         for row in cursor.fetchall():
-            print(f"  #{row['id']}  {row['product']:<25s}  ${row['amount']:.2f}  [{row['status']}]")
+            print(f"  #{row['id']}  {row['product_id']}  ${row['quantity']}  [{row['status']}]")
             
 
 # ──────────────────────────────────────────────────────────
@@ -67,20 +67,20 @@ def demo_parameterized(conn):
 
         # Always use %s placeholders — NEVER f-strings in SQL
         cursor.execute(
-            "SELECT id, product, amount FROM orders WHERE status = %s",
+            "SELECT id, product_id, quantity FROM orders WHERE status = %s",
             (status_filter,)          # ← must be a tuple, even for one value
         )
         rows = cursor.fetchall()
         print(f"Orders with status='{status_filter}':")
         for r in rows:
-            print(f"  #{r['id']}  {r['product']:<25s}  ${r['amount']:.2f}")
+            print(f"  #{r['id']}  {r['product_id']}  ${r['quantity']}")
 
         # Multiple parameters
         cursor.execute(
-            "SELECT * FROM orders WHERE amount > %s AND status = %s",
-            (50.0, "shipped")
+            "SELECT * FROM orders WHERE quantity > %s AND status = %s",
+            (2, "shipped")
         )
-        print(f"\nShipped orders over $50: {len(cursor.fetchall())} found")
+        print(f"\nShipped orders over 2 times: {len(cursor.fetchall())} found")
 
 
 # ──────────────────────────────────────────────────────────
@@ -91,14 +91,14 @@ def demo_insert(conn):
 
     new_order = {
         "customer_id": 1,
-        "product":     "Python Textbook",
-        "amount":      59.99,
+        "product_id":  1,
+        "quantity":    3,
         "status":      "pending",
     }
 
     sql = """
-        INSERT INTO orders (customer_id, product, amount, status)
-        VALUES (%(customer_id)s, %(product)s, %(amount)s, %(status)s)
+        INSERT INTO orders (customer_id, product_id, quantity, status)
+        VALUES (%(customer_id)s, %(product_id)s, %(quantity)s, %(status)s)
     """
 
     with conn.cursor() as cursor:
@@ -116,8 +116,8 @@ def demo_update(conn):
     with conn.cursor() as cursor:
         # Update the order we just inserted
         cursor.execute(
-            "UPDATE orders SET status = %s WHERE status = %s AND product = %s",
-            ("shipped", "pending", "Python Textbook")
+            "UPDATE orders SET status = %s WHERE status = %s AND product_id = %s",
+            ("shipped", "pending", 2)
         )
         conn.commit()
         print(f"Rows affected: {cursor.rowcount}")
@@ -136,8 +136,8 @@ def demo_delete_with_rollback(conn):
 
         # Delete the test order
         cursor.execute(
-            "DELETE FROM orders WHERE product = %s",
-            ("Python Textbook",)
+            "DELETE FROM orders WHERE product_id = %s",
+            (1,)
         )
         print(f"Deleted {cursor.rowcount} row(s) — NOT committed yet")
 
@@ -149,24 +149,6 @@ def demo_delete_with_rollback(conn):
         after = cursor.fetchone()[0]
         print(f"Orders after rollback: {after}")
 
-
-# ──────────────────────────────────────────────────────────
-# 7. executemany() — bulk inserts
-# ──────────────────────────────────────────────────────────
-def demo_bulk_insert(conn):
-    print("\n── BULK INSERT (executemany) ──────────────────────")
-
-    batch = [
-        (2, "USB Cable",      9.99, "pending"),
-        (3, "HDMI Adapter",  19.99, "pending"),
-        (4, "SD Card 128GB", 29.99, "shipped"),
-    ]
-    sql = "INSERT INTO orders (customer_id, product, amount, status) VALUES (%s, %s, %s, %s)"
-
-    with conn.cursor() as cursor:
-        cursor.executemany(sql, batch)
-        conn.commit()
-        print(f"Inserted {cursor.rowcount} rows in one call")
 
 
 # ──────────────────────────────────────────────────────────
@@ -181,7 +163,6 @@ if __name__ == "__main__":
         demo_insert(conn)
         demo_update(conn)
         demo_delete_with_rollback(conn)
-        demo_bulk_insert(conn)
         print("Lab 1 complete!")
     except MySQLError as e:
         print(f"MySQL error: {e}")
